@@ -101,19 +101,67 @@ defines:
 |---|---|---|
 | lint | `lint` | `ruff check .` |
 | test | `test` | pytest with coverage; JUnit + Cobertura reports surface pass/fail and coverage directly in the MR |
-| test | `sast`, `secret_detection`, `dependency_scanning` | GitLab-managed scanners (via `include: template:`), findings shown in the MR Security widget |
+| test | `sast` (semgrep), `secret_detection` | GitLab-managed scanners (via `include: template:`), findings shown in the MR Security widget |
 | build | `build` | builds & pushes `gateway`/`worker` images to the project's Container Registry |
 | security | `container_scanning`, `container_scanning_worker` | scans the two images just built for known CVEs |
+| security | `pip-audit` | audits our actual Python dependencies — see below for why this exists instead of GitLab's Dependency Scanning |
 
 The `workflow: rules` block runs this as a **merge request pipeline** whenever
 an MR is open (falling back to a branch pipeline on `main` otherwise), which
 is what makes GitLab attach scanner results to the MR itself instead of a
 report nobody opens — a reviewer sees new/fixed vulnerabilities inline before
-approving, the same way they see the diff.
+approving, the same way they see the diff. Getting the scanners to actually
+run on MR pipelines needed one more thing: GitLab's security templates
+default to running only on **branch** pipelines (to avoid double-scanning an
+MR and its target branch), so `AST_ENABLE_MR_PIPELINES: "true"` is set
+explicitly — without it, `sast`/`secret_detection`/`container_scanning` never
+appear in the MR pipeline at all, silently, with no error.
 
 `.github/workflows/ci.yml` runs a smaller lint/test/build job on GitHub so
 this mirror's checks stay green; it isn't where the security scanning story
 lives.
+
+## Vulnerability triage
+
+Running actual scanners against actual dependencies surfaces actual noise.
+Here's what showed up and what I did about each kind, working end to end
+through GitLab's [merge request !1](https://gitlab.com/abdelwb/cicd-security-pipeline/-/merge_requests/1):
+
+**A real, fixed vulnerability.** `pip-audit` flagged 14 known CVEs in
+`starlette 0.38.6`, pulled in transitively by `fastapi==0.115.0` — a couple
+of them genuinely exploitable (a DoS via unbounded form-field buffering, an
+SSRF via UNC-path resolution on Windows, a Host-header/path confusion that
+could bypass path-based auth checks). Fix: bumped to `fastapi==0.141.1`,
+which requires `starlette>=0.46.0` and pulls a version with every one of
+those patched. Verified by rerunning the pipeline: `test` and `build` still
+pass (13/13 tests, same coverage), and `pip-audit` goes from 14 findings to
+`No known vulnerabilities found`. This is the difference between "turned on
+a scanner" and "used one" — the finding was real, the fix was real, and the
+pipeline is what proved neither broke anything.
+
+**Dependency Scanning that doesn't run, on purpose.** `.gitlab-ci.yml` still
+`include`s `Security/Dependency-Scanning.gitlab-ci.yml`, but it never
+contributes a job here: GitLab's `gemnasium-python-dependency_scanning` gates
+on `$GITLAB_FEATURES =~ /\bdependency_scanning\b/`, a paid-tier flag this
+Free namespace doesn't have (unlike SAST and Secret Detection, which have no
+such gate). Rather than leave Python dependencies unscanned, the `pip-audit`
+job above is a free, direct substitute — same idea (audit declared
+dependencies against a known-vulnerability database), different tool. It's
+literally how it found the starlette CVEs above.
+
+**Container-scanning noise that isn't noise, exactly — just not ours.** The
+`container_scanning` jobs report dozens of CVEs in the `python:3.12-slim`
+base image: glibc, perl, util-linux, tar, gzip, sqlite, systemd libraries,
+PAM. Three are rated Critical, all in `perl-base` (Archive::Tar and regex
+bugs) — but this application never invokes Perl; it's bundled OS tooling
+Debian ships regardless. GitLab's container-scanning job sets
+`allow_failure: true` by default specifically because this is expected: the
+job's role is to surface findings for a human to triage in the MR, not to
+block a merge on every base-image patch level. No code change here — the
+judgment call itself (which findings are reachable, which aren't) is the
+point of running the scanner in the first place. Rebuilding periodically
+against a fresher base image tag is the actual mitigation for this category,
+same as it would be for any container.
 
 ## Project layout
 
