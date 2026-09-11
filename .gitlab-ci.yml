@@ -28,6 +28,14 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   GATEWAY_IMAGE: "$CI_REGISTRY_IMAGE/gateway:$CI_COMMIT_SHORT_SHA"
   WORKER_IMAGE: "$CI_REGISTRY_IMAGE/worker:$CI_COMMIT_SHORT_SHA"
+  # GitLab's SAST/Secret-Detection/Dependency-Scanning/Container-Scanning
+  # templates default to running only on branch pipelines (to avoid
+  # duplicate scans between an MR pipeline and its target branch), which
+  # would leave them off the MR entirely under our merge-request-pipeline
+  # workflow below. This flag is the documented opt-in that makes them run
+  # in the merge request pipeline instead, which is the whole point here:
+  # https://docs.gitlab.com/ci/pipelines/merge_request_pipelines/
+  AST_ENABLE_MR_PIPELINES: "true"
 
 default:
   image: python:3.12-slim
