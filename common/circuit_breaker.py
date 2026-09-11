@@ -7,8 +7,9 @@ behavior exercised by the "Redis down" failure demo described in the
 README.
 """
 import time
+from collections.abc import Awaitable, Callable
 from enum import Enum
-from typing import Awaitable, Callable, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 

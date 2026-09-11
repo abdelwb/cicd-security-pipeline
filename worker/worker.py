@@ -53,11 +53,16 @@ async def process_job(r, job: dict, breaker: CircuitBreaker) -> None:
             # process) to actually feel the memory pressure.
             allocate_and_hold(int(payload.get("size_mb", 256)))
     except Exception as exc:  # noqa: BLE001 - deliberately broad: any job error is "failed"
+        # Captured into a plain variable (not referenced from the lambda as
+        # `exc` directly): Python deletes an `except ... as name` binding as
+        # soon as the block exits, so a closure that outlives the block would
+        # raise NameError if it ever tried to read `exc` after the fact.
+        error_message = str(exc)
         jobs_processed_total.labels(outcome="failed").inc()
         await breaker.call(
-            lambda: _set_status(r, job_id, state=JobState.FAILED.value, error=str(exc))
+            lambda: _set_status(r, job_id, state=JobState.FAILED.value, error=error_message)
         )
-        log.warning("job %s failed: %s", job_id, exc)
+        log.warning("job %s failed: %s", job_id, error_message)
         return
 
     jobs_processed_total.labels(outcome="done").inc()
