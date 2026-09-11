@@ -176,7 +176,7 @@ scripts/    local build/run helpers
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+[MIT](LICENSE)
 
 ---
 
