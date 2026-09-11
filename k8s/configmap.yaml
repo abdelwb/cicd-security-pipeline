@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: job-pipeline-config
+  namespace: job-pipeline
+data:
+  REDIS_URL: "redis://redis:6379/0"
+  MAX_QUEUE_LENGTH: "50"
+  CB_FAILURE_THRESHOLD: "5"
+  CB_RESET_TIMEOUT_S: "10"
+  WORKER_POLL_TIMEOUT_S: "5"

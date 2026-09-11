@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: job-pipeline
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: worker}
+  template:
+    metadata:
+      labels: {app: worker}
+    spec:
+      containers:
+        - name: worker
+          image: cicd-security-pipeline/worker:local
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 9100}]
+          envFrom:
+            - configMapRef: {name: job-pipeline-config}
+          resources:
+            requests: {cpu: "50m", memory: "64Mi"}
+            # Deliberately low so the {"simulate": "oom", "size_mb": 512}
+            # demo job gets OOMKilled instead of just pressuring the node.
+            limits: {cpu: "500m", memory: "256Mi"}

@@ -1,0 +1,38 @@
+# The primary CI/CD + security-scanning pipeline for this project lives in
+# .gitlab-ci.yml (this repo is mirrored to GitLab so the merge-request
+# vulnerability scanning demo actually runs there - see README.md).
+#
+# This GitHub workflow just keeps the GitHub mirror green: lint, run the
+# test suite, and build the images to catch anything that would break
+# Docker builds, on every push/PR.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest --junitxml=report.xml --cov=common --cov=gateway --cov=worker --cov-report=term
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: report.xml
+
+  build-images:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f gateway/Dockerfile -t gateway:ci .
+      - run: docker build -f worker/Dockerfile -t worker:ci .
