@@ -4,10 +4,12 @@
 #   1. Run the real pytest suite as a required MR check (test job).
 #   2. Build the two service images and push them to the project's
 #      Container Registry.
-#   3. Wire GitLab's managed vulnerability scanners (SAST, Secret Detection,
-#      Dependency Scanning, Container Scanning) directly into merge request
-#      pipelines, so findings show up in the MR's Security widget before
-#      anything merges — not as a separate, easy-to-ignore report.
+#   3. Wire vulnerability scanners directly into merge request pipelines, so
+#      findings show up in the MR's Security widget before anything merges —
+#      not as a separate, easy-to-ignore report. That's GitLab-managed SAST,
+#      Secret Detection, and Container Scanning; Dependency Scanning is
+#      Ultimate-only (see the pip-audit job below for why and what stands in
+#      for it here).
 #
 # `workflow:rules` below is the standard GitLab pattern to get exactly one
 # pipeline per push: a merge request pipeline while an MR is open, otherwise
@@ -82,9 +84,11 @@ build:
 
 # --- Vulnerability scanning, wired into the MR pipeline -----------------
 # GitLab-managed templates: https://docs.gitlab.com/ee/user/application_security/
-# Each contributes a job (SAST, Secret Detection, Dependency Scanning run
-# purely against source; Container Scanning below is repointed at the
-# images this pipeline just built).
+# SAST and Secret Detection run purely against source; Container Scanning
+# below is repointed at the images this pipeline just built. The
+# Dependency-Scanning template is still included for documentation purposes
+# (its config comments explain the available knobs) but contributes no job
+# on this Free-tier namespace - see the pip-audit job below.
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
@@ -101,3 +105,17 @@ container_scanning_worker:
   extends: container_scanning
   variables:
     CS_IMAGE: "$WORKER_IMAGE"
+
+# GitLab's Dependency-Scanning template (included above) never actually adds
+# a job on GitLab Free: gemnasium-python-dependency_scanning's own rules
+# require `$GITLAB_FEATURES =~ /\bdependency_scanning\b/`, a paid-tier
+# feature flag this namespace doesn't have - unlike SAST/Secret Detection,
+# which have no such gate. Rather than leave our actual Python dependencies
+# (fastapi, redis, pydantic, ...) unscanned, audit them with pip-audit
+# (PyPA's own tool, free) as a direct substitute in the same pipeline.
+pip-audit:
+  stage: security
+  script:
+    - pip install pip-audit==2.10.1
+    - pip-audit -r gateway/requirements.txt -r worker/requirements.txt --desc on
+  allow_failure: true
