@@ -16,9 +16,6 @@ class Settings:
     cb_failure_threshold: int = int(os.getenv("CB_FAILURE_THRESHOLD", "5"))
     cb_reset_timeout_s: float = float(os.getenv("CB_RESET_TIMEOUT_S", "10"))
 
-    # How long a job is allowed to sit in "queued" before the worker times it out.
-    job_timeout_s: float = float(os.getenv("JOB_TIMEOUT_S", "30"))
-
     queue_key: str = os.getenv("QUEUE_KEY", "jobs:queue")
     status_key_prefix: str = os.getenv("STATUS_KEY_PREFIX", "jobs:status:")
 
