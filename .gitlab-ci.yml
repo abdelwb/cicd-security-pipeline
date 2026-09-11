@@ -5,7 +5,7 @@
 #   2. Build the two service images and push them to the project's
 #      Container Registry.
 #   3. Wire vulnerability scanners directly into merge request pipelines, so
-#      findings show up in the MR's Security widget before anything merges —
+#      findings show up in the MR's Security widget before anything merges -
 #      not as a separate, easy-to-ignore report. That's GitLab-managed SAST,
 #      Secret Detection, and Container Scanning; Dependency Scanning is
 #      Ultimate-only (see the pip-audit job below for why and what stands in
