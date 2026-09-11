@@ -173,3 +173,11 @@ tests/      pytest suite (fakeredis-backed, no external services needed)
 k8s/        k3s manifests
 scripts/    local build/run helpers
 ```
+
+## License
+
+MIT - see [LICENSE](LICENSE).
+
+---
+
+Built by Abdullah Abdelwahab as a demonstration of GitLab CI/CD test automation and merge-request-integrated vulnerability scanning.
