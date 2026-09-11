@@ -4,6 +4,8 @@ protects itself from a struggling Redis with a circuit breaker.
 import json
 import time
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
@@ -13,7 +15,14 @@ from common.models import JobState, JobStatus, JobSubmission
 from common.redis_client import close_redis, get_redis
 from common.settings import settings
 
-app = FastAPI(title="job-gateway", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    yield
+    await close_redis()
+
+
+app = FastAPI(title="job-gateway", version="1.0.0", lifespan=lifespan)
 breaker = CircuitBreaker(
     failure_threshold=settings.cb_failure_threshold,
     reset_timeout_s=settings.cb_reset_timeout_s,
@@ -31,11 +40,6 @@ circuit_breaker_state = Gauge(
 )
 
 _STATE_VALUE = {"closed": 0, "half_open": 1, "open": 2}
-
-
-@app.on_event("shutdown")
-async def _shutdown() -> None:
-    await close_redis()
 
 
 @app.get("/health")
